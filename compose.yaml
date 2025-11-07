@@ -1,0 +1,64 @@
+networks:
+  sparkpg_network:
+
+services:
+  spark-master:
+    image: andreanidouglas/spark
+    container_name: spark-master
+    networks:
+      - sparkpg_network
+    entrypoint: /bin/bash
+    command: -c "/opt/spark/sbin/start-master.sh; tail -f /dev/null"
+    volumes:
+      - spark-logs:/opt/spark/spark-events
+      - ./data:/opt/spark/data
+    ports:
+      - "8080:8080"
+
+  spark-worker:
+    image: andreanidouglas/spark
+    volumes:
+      - ./data:/opt/spark/data
+      - ./spark-logs:/opt/spark/spark-events
+    networks:
+      - sparkpg_network
+    entrypoint: /bin/bash
+    command: -c "/opt/spark/sbin/start-worker.sh  spark://spark-master:7077; tail -f /dev/null"
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 16G
+      replicas: 5
+  spark-connect:
+    image: andreanidouglas/spark
+    container_name: spark-connect
+    hostname: spark-connect
+    volumes:
+      - ./data:/opt/spark/data
+      - ./spark-logs:/opt/spark/spark-events
+    networks:
+      - sparkpg_network
+    ports:
+      - "4040:4040"
+      - "15002:15002"
+    depends_on:
+      - spark-master
+    command: -c "/opt/spark/sbin/start-connect-server.sh --jars /opt/spark/jars/spark-connect_2.13-4.0.1.jar && tail -f /dev/null"
+
+  spark-history-server:
+    container_name: spark-history
+    image: andreanidouglas/spark
+    networks:
+      - sparkpg_network
+    depends_on:
+      - spark-master
+    volumes:
+      - ./data:/opt/spark/data
+      - spark-logs:/opt/spark/spark-events
+    ports:
+      - "18080:18080"
+    command: -c "/opt/spark/sbin/start-history-server.sh && tail -f /dev/null"
+
+volumes:
+  spark-logs:
