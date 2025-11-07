@@ -26,10 +26,14 @@ dfs = (
     .schema(schema)
     .csv("/opt/spark/data/weather_stations.csv")
 )
+
+to_fahrenheitUDF = spark.udf.register("to_fahrenheit", to_fahrenheit, DoubleType())
 print("INFO: Finish reading data", file=sys.stderr)
 
 
-dfs = dfs.where(dfs.temperature.isNotNull())
+dfs = dfs.where(dfs.temperature.isNotNull()).select(
+    "city", to_fahrenheit(dfs.temperature).alias("temperature")
+)
 
 dfs.groupby("city").agg(
     max("temperature"), min("temperature"), mean("temperature")
